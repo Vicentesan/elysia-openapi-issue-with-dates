@@ -1,7 +1,35 @@
+import { openapi } from "@elysiajs/openapi";
 import { Elysia } from "elysia";
+import { z } from "zod";
 
-const app = new Elysia().get("/", () => "Hello Elysia").listen(3000);
+new Elysia()
+	.use(
+		openapi({
+			mapJsonSchema: {
+				zod: z.toJSONSchema,
+			},
+		}),
+	)
+	// this throw an error
+	.get(
+		"/error/hello/:name",
+		({ params, status }) => {
+			const date = new Date();
 
-console.log(
-  `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
-);
+			return status(200, {
+				name: params.name,
+				date,
+			});
+		},
+		{
+			response: {
+				200: z.object({
+					name: z.string(),
+					date: z.date(),
+				}),
+			},
+		},
+	)
+	.listen(3000, ({ port, hostname }) =>
+		console.log(`Server started on http://${hostname}:${port}`),
+	);
