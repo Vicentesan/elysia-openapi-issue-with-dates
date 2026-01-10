@@ -1,61 +1,20 @@
-import { openapi } from "@elysiajs/openapi";
+import { Effect, Schema } from "effect";
 import { Elysia } from "elysia";
-import { z } from "zod";
 
-new Elysia()
-	.use(
-		openapi({
-			mapJsonSchema: {
-				zod: z.toJSONSchema,
-			},
-		}),
-	)
-	.get(
-		"/error/hello/:name",
-		({ params, status }) => {
-			const date = new Date();
+import { runtime } from "./runtime";
 
-			return status(200, {
-				name: params.name,
-				date,
-			});
-		},
-		{
-			// Issue: z.date() does not properly serialize to OpenAPI schema
-			// The response schema is not visible in the generated OpenAPI documentation
-			// because z.date() doesn't translate well to JSON Schema format
+const program = Effect.gen(function* () {
+	return new Elysia()
+		.get("/", () => new Date(), {
 			response: {
-				200: z.object({
-					name: z.string(),
-					date: z.date(),
-				}),
+				200: Schema.standardSchemaV1(Schema.Date),
 			},
-		},
-	)
-	.get(
-		"/hello/:name",
-		({ params, status }) => {
-			const date = new Date();
+		})
+		.listen(8080, ({ hostname, port }) =>
+			runtime.runSync(Effect.log(`Server is running on ${hostname}:${port}`)),
+		);
+});
 
-			return status(200, {
-				name: params.name,
-				// TypeScript error: Type 'Date' is not assignable to type 'string'
-				// z.iso.date() expects an ISO date string, but we're passing a Date object
-				date,
-			});
-		},
-		{
-			// Solution: z.iso.date() properly serializes to OpenAPI schema as a string format
-			// The response schema is correctly displayed in the OpenAPI documentation
-			// However, runtime values must be ISO date strings, not Date objects
-			response: {
-				200: z.object({
-					name: z.string(),
-					date: z.iso.date(),
-				}),
-			},
-		},
-	)
-	.listen(3000, ({ port, hostname }) =>
-		console.log(`Server started on http://${hostname}:${port}`),
-	);
+const app = await runtime.runPromise(program);
+
+export type App = typeof app;
